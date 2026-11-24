@@ -1,16 +1,30 @@
+import { useMemo } from "react";
 import { useParams, Link, Navigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 import { useAppData } from "@/context/AppDataContext";
 import { formatCurrency, formatPercent, formatDate, formatDateTime, milestoneBadgeClass } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { PaymentTimelineChart } from "@/components/PaymentTimelineChart";
+import { RecommendedActionsCard } from "@/components/client/RecommendedActionsCard";
+import { ClientProfileCard } from "@/components/client/ClientProfileCard";
+import { groupForecastByType } from "@/lib/forecast";
+import { buildActionContext, flagsForClient } from "@/lib/buyerIntelligence";
 
 export function ClientDetail() {
   const { id } = useParams<{ id: string }>();
-  const { data, updateClientDocuments, displayName } = useAppData();
+  const { data, updateClientDocuments, displayName, profileFor } = useAppData();
   const client = data.clients.find((c) => c.id === id);
 
+  const flags = useMemo(() => {
+    if (!client) return [];
+    const ctx = buildActionContext(groupForecastByType(data), (c) => profileFor(c)?.personal.birthdate);
+    return flagsForClient(client, ctx);
+  }, [client, data, profileFor]);
+
   if (!client) return <Navigate to="/clients" replace />;
+
+  const profile = profileFor(client);
+  const profileSource = profile && data.paf_imports.find((r) => r.id === profile.source_import_id);
 
   const history = data.payment_history
     .filter((h) => h.client_id === client.id)
@@ -54,6 +68,10 @@ export function ClientDetail() {
           />
         </div>
       </div>
+
+      <RecommendedActionsCard flags={flags} />
+
+      <ClientProfileCard profile={profile} source={profileSource} masked={data.settings.hide_customer_names} />
 
       <Card>
         <CardHeader>

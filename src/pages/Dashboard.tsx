@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   UsersRound,
   RefreshCw,
@@ -8,13 +8,6 @@ import {
   TrendingUp,
   CheckCircle2,
   AlertTriangle,
-  Layers,
-  BadgeDollarSign,
-  Gift,
-  Clock,
-  CalendarCheck,
-  Send,
-  Phone,
   ArrowRight,
   type LucideIcon,
 } from "lucide-react";
@@ -26,8 +19,6 @@ import {
   buildRepeatBuyerPersona,
   computeCustomerActions,
   summarizeCustomerBase,
-  type ActionFlag,
-  type ActionPriority,
   type BuyerPersona,
   type CustomerAction,
   type ProspectProfile,
@@ -35,12 +26,13 @@ import {
 import { cn, formatCompactCurrency, formatCurrency, formatPercent, formatDateTime, milestoneBadgeClass } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { FlagChip, PriorityPill, RecommendedAction } from "@/components/actions/ActionBadges";
 
 /** Rows shown in the priority table before "View all" is expanded. */
 const PRIORITY_PREVIEW_ROWS = 5;
 
 export function Dashboard() {
-  const { data, displayName } = useAppData();
+  const { data, displayName, profileFor } = useAppData();
   const { clients, notifications } = data;
 
   const insights = useMemo(() => {
@@ -51,9 +43,9 @@ export function Dashboard() {
       summary: summarizeCustomerBase(data.clients),
       persona: buildRepeatBuyerPersona(data.clients, inactiveIds),
       prospects: buildProspectProfile(data.clients, inactiveIds),
-      actions: computeCustomerActions(data, forecast),
+      actions: computeCustomerActions(data, forecast, new Date(), (c) => profileFor(c)?.personal.birthdate),
     };
-  }, [data]);
+  }, [data, profileFor]);
 
   const { forecast, summary, persona, prospects, actions } = insights;
   const recent = notifications.slice(0, 8);
@@ -289,19 +281,6 @@ function ProspectBullet({ label, count, emphasis }: { label: string; count: numb
   );
 }
 
-const FLAG_STYLE: Record<ActionFlag, { icon: LucideIcon; actionIcon: LucideIcon; className: string }> = {
-  repeat_purchase: { icon: Layers, actionIcon: CalendarCheck, className: "flag-chip-repeat" },
-  payment_milestone: { icon: BadgeDollarSign, actionIcon: Send, className: "flag-chip-milestone" },
-  relationship_touchpoint: { icon: Gift, actionIcon: Gift, className: "flag-chip-touchpoint" },
-  inactive_engagement: { icon: Clock, actionIcon: Phone, className: "flag-chip-inactive" },
-};
-
-const PRIORITY_STYLE: Record<ActionPriority, string> = {
-  high: "priority-pill-high",
-  medium: "priority-pill-medium",
-  low: "priority-pill-low",
-};
-
 function PriorityActionsTable({
   actions,
   displayName,
@@ -310,6 +289,7 @@ function PriorityActionsTable({
   displayName: (name: string) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const navigate = useNavigate();
   const visible = expanded ? actions : actions.slice(0, PRIORITY_PREVIEW_ROWS);
   const canExpand = actions.length > PRIORITY_PREVIEW_ROWS;
 
@@ -348,22 +328,29 @@ function PriorityActionsTable({
               </thead>
               <tbody>
                 {visible.map(({ client, primary, flags }) => {
-                  const style = FLAG_STYLE[primary.flag];
-                  const FlagIcon = style.icon;
-                  const ActionIcon = style.actionIcon;
                   const others = flags.slice(1);
+                  const open = () => navigate(`/clients/${client.id}`);
                   return (
-                    <tr key={client.id}>
+                    <tr
+                      key={client.id}
+                      className="row-link"
+                      tabIndex={0}
+                      aria-label={`Open ${displayName(client.name)}`}
+                      onClick={(e) => {
+                        // The name is already a link; don't navigate twice.
+                        if (!(e.target as HTMLElement).closest("a")) open();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && e.target === e.currentTarget) open();
+                      }}
+                    >
                       <td className="font-medium">
                         <Link to={`/clients/${client.id}`} className="hover:text-primary hover:underline">
                           {displayName(client.name)}
                         </Link>
                       </td>
                       <td>
-                        <span className={cn("flag-chip", style.className)}>
-                          <FlagIcon size={14} aria-hidden />
-                          {ACTION_FLAG_LABELS[primary.flag]}
-                        </span>
+                        <FlagChip flag={primary.flag} />
                         {others.length > 0 && (
                           <span
                             className="ml-2 text-xs text-muted-foreground"
@@ -375,13 +362,10 @@ function PriorityActionsTable({
                       </td>
                       <td className="text-muted-foreground">{primary.keyIndicator}</td>
                       <td>
-                        <span className="inline-flex items-center gap-2">
-                          <ActionIcon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-                          {primary.recommendedAction}
-                        </span>
+                        <RecommendedAction flag={primary.flag} text={primary.recommendedAction} />
                       </td>
                       <td className="text-right">
-                        <span className={cn("priority-pill", PRIORITY_STYLE[primary.priority])}>{primary.priority}</span>
+                        <PriorityPill priority={primary.priority} />
                       </td>
                     </tr>
                   );

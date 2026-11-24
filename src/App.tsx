@@ -6,6 +6,7 @@ import { Clients } from "@/pages/Clients";
 import { ClientDetail } from "@/pages/ClientDetail";
 import { Forecast } from "@/pages/Forecast";
 import { Upload } from "@/pages/Upload";
+import { UploadPaf } from "@/pages/UploadPaf";
 import { Reports } from "@/pages/Reports";
 import { Notifications } from "@/pages/Notifications";
 
@@ -20,6 +21,7 @@ function App() {
             <Route path="/clients/:id" element={<ClientDetail />} />
             <Route path="/forecast" element={<Forecast />} />
             <Route path="/upload" element={<Upload />} />
+            <Route path="/upload-paf" element={<UploadPaf />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/notifications" element={<Notifications />} />
           </Route>

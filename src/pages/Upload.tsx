@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
-import { UploadCloud, FileText, CheckCircle2, AlertCircle, Files, Trash2 } from "lucide-react";
+import { FileText, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAppData, type ImportFileResult } from "@/context/AppDataContext";
 import { formatDateTime, formatPercent, milestoneBadgeClass } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { DropZone } from "@/components/upload/DropZone";
+import { ImportHistory } from "@/components/upload/ImportHistory";
 
 interface FileError {
   fileName: string;
@@ -13,10 +14,8 @@ interface FileError {
 
 export function Upload() {
   const { data, importFile, removeImport, displayName } = useAppData();
-  const [isDragging, setIsDragging] = useState(false);
   const [errors, setErrors] = useState<FileError[]>([]);
   const [results, setResults] = useState<ImportFileResult[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Files are imported one after another, in the order given, so each builds on the last.
   const handleFiles = useCallback(
@@ -58,41 +57,12 @@ export function Upload() {
         </p>
       </div>
 
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setIsDragging(false);
-          const files = Array.from(e.dataTransfer.files ?? []);
-          if (files.length > 0) handleFiles(files);
-        }}
-        onClick={() => inputRef.current?.click()}
-        className={`glass-card flex flex-col items-center justify-center gap-3 border-2 border-dashed py-16 text-center cursor-pointer transition-colors ${
-          isDragging ? "border-primary bg-primary/5" : "border-border"
-        }`}
-      >
-        <UploadCloud size={32} className="text-primary" />
-        <div>
-          <p className="text-sm font-medium">Drag & drop one or more report files here, or click to browse</p>
-          <p className="text-xs text-muted-foreground mt-1">Expects the daily Sales Report export — matched by column header, not position: Customer Name, TCP, Payment Percentage</p>
-        </div>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".csv,.tsv,.txt,.xls,text/csv,text/tab-separated-values,text/plain"
-          className="hidden"
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? []);
-            if (files.length > 0) handleFiles(files);
-            e.target.value = "";
-          }}
-        />
-      </div>
+      <DropZone
+        accept=".csv,.tsv,.txt,.xls,text/csv,text/tab-separated-values,text/plain"
+        title="Drag & drop one or more report files here, or click to browse"
+        hint="Expects the daily Sales Report export — matched by column header, not position: Customer Name, TCP, Payment Percentage"
+        onFiles={handleFiles}
+      />
 
       {errors.map((err, i) => (
         <Card key={`${i}-${err.fileName}`} className="border-destructive/40">
@@ -142,67 +112,30 @@ export function Upload() {
         </Card>
       ))}
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Files size={16} className="text-muted-foreground" />
-            <CardTitle>Imported Files</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {importsNewestFirst.length === 0 && !data.baseline ? (
-            <p className="text-sm text-muted-foreground">No files imported yet. Uploaded reports will appear here.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>File</th>
-                    <th>Imported</th>
-                    <th>Rows</th>
-                    <th>Customers</th>
-                    <th className="text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {importsNewestFirst.map((record) => (
-                    <tr key={record.id}>
-                      <td className="font-medium break-all">{record.file_name}</td>
-                      <td className="text-muted-foreground whitespace-nowrap">{formatDateTime(record.imported_at)}</td>
-                      <td className="font-mono">{record.row_count}</td>
-                      <td className="font-mono">{record.customers_processed}</td>
-                      <td className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleRemove(record.id, record.file_name)}
-                          aria-label={`Remove ${record.file_name}`}
-                        >
-                          <Trash2 size={14} />
-                          Remove
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {data.baseline && (
-                    <tr>
-                      <td className="font-medium text-muted-foreground">Data imported before file tracking</td>
-                      <td className="text-muted-foreground whitespace-nowrap">Before {formatDateTime(data.baseline.captured_at)}</td>
-                      <td className="font-mono text-muted-foreground">—</td>
-                      <td className="font-mono text-muted-foreground">{data.baseline.clients.length}</td>
-                      <td className="text-right text-xs text-muted-foreground">Can't be removed</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground mt-3">
-            Removing a file rebuilds payment data from the remaining files in the order they were imported. Documentation status is never changed.
-          </p>
-        </CardContent>
-      </Card>
+      <ImportHistory
+        title="Imported Files"
+        columns={["Rows", "Customers"]}
+        rows={importsNewestFirst.map((record) => ({
+          id: record.id,
+          fileName: record.file_name,
+          importedAt: record.imported_at,
+          cells: [record.row_count, record.customers_processed],
+        }))}
+        onRemove={handleRemove}
+        emptyText="No files imported yet. Uploaded reports will appear here."
+        footnote="Removing a file rebuilds payment data from the remaining files in the order they were imported. Documentation status is never changed."
+        trailingRows={
+          data.baseline && (
+            <tr>
+              <td className="font-medium text-muted-foreground">Data imported before file tracking</td>
+              <td className="text-muted-foreground whitespace-nowrap">Before {formatDateTime(data.baseline.captured_at)}</td>
+              <td className="font-mono text-muted-foreground">—</td>
+              <td className="font-mono text-muted-foreground">{data.baseline.clients.length}</td>
+              <td className="text-right text-xs text-muted-foreground">Can't be removed</td>
+            </tr>
+          )
+        }
+      />
 
       <Card>
         <CardHeader>

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Awaiting approval (Design phase — no production code) |
+| **Status** | Approved 24 Nov 2026 · Built on this branch |
 | **Branch** | `claude/busy-brahmagupta-w68qmn` |
 | **Input** | `Fake_Customer_Details_From_PAF.xlsx` (template supplied by the user) |
 | **Related** | Dashboard → *Customer Priority & Recommended Actions*; Client detail page |

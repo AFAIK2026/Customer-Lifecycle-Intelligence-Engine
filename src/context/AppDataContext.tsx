@@ -1,16 +1,24 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { AppData, Notification } from "@/types";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { AppData, Client, ClientProfile, Notification } from "@/types";
 import { loadData, saveData } from "@/lib/storage";
 import { parseSalesReport } from "@/lib/salesReport";
 import { applyImport, removeImport as removeImportFromData } from "@/lib/imports";
 import { buildDocStatus, detectNewMilestones } from "@/lib/milestones";
 import { sendMilestoneAlerts } from "@/lib/email";
 import { aliasLabel } from "@/lib/customerAliases";
+import { parsePafWorkbook, type PafParseResult, type WorkbookSheet } from "@/lib/paf";
+import { applyPafImport, createProfileLookup, removePafImport as removePafImportFromData, type PafRowMatch } from "@/lib/pafImports";
 
 export interface ImportFileResult {
   fileName: string;
   customersProcessed: number;
   newNotifications: Notification[];
+}
+
+export interface ImportPafResult extends Omit<PafParseResult, "rows"> {
+  fileName: string;
+  rowCount: number;
+  matches: PafRowMatch[];
 }
 
 interface AppDataContextValue {
@@ -19,6 +27,12 @@ interface AppDataContextValue {
   importFile: (fileName: string, text: string) => ImportFileResult;
   /** Removes an import and rebuilds payment data without it. */
   removeImport: (importId: string) => void;
+  /** Parses and applies a PAF workbook, recording it as an import. Throws on invalid workbooks or full storage. */
+  importPafWorkbook: (fileName: string, sheets: WorkbookSheet[]) => ImportPafResult;
+  /** Removes a PAF import and rebuilds client profiles without it. */
+  removePafImport: (importId: string) => void;
+  /** The client's Purchase Application Form details, if any were uploaded. */
+  profileFor: (client: Client) => ClientProfile | undefined;
   setAlertEmail: (email: string) => void;
   setHideCustomerNames: (hide: boolean) => void;
   /** The name to show for a customer: "Customer N" while names are hidden, the real name otherwise. */
@@ -64,6 +78,24 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   function removeImport(importId: string) {
     setData((prev) => removeImportFromData(prev, importId));
   }
+
+  function importPafWorkbook(fileName: string, sheets: WorkbookSheet[]): ImportPafResult {
+    const { rows, ...parse } = parsePafWorkbook(sheets);
+    if (rows.length === 0) throw new Error("No customer rows found on the Customer Details sheet");
+    const result = applyPafImport(dataRef.current, { fileName, rows });
+
+    // Save up front so a full browser storage is reported as an import error.
+    saveData(result.data);
+    dataRef.current = result.data;
+    setData(result.data);
+    return { ...parse, fileName, rowCount: rows.length, matches: result.matches };
+  }
+
+  function removePafImport(importId: string) {
+    setData((prev) => removePafImportFromData(prev, importId));
+  }
+
+  const profileFor = useMemo(() => createProfileLookup(data), [data]);
 
   function setAlertEmail(email: string) {
     setData((prev) => ({ ...prev, settings: { ...prev.settings, alert_email: email } }));
@@ -120,7 +152,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppDataContext.Provider value={{ data, importFile, removeImport, setAlertEmail, setHideCustomerNames, displayName, updateClientDocuments }}>
+    <AppDataContext.Provider value={{ data, importFile, removeImport, importPafWorkbook, removePafImport, profileFor, setAlertEmail, setHideCustomerNames, displayName, updateClientDocuments }}>
       {children}
     </AppDataContext.Provider>
   );

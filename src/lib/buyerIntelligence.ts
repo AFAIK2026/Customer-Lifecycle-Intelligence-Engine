@@ -233,82 +233,128 @@ function anniversaryInYear(credit: Date, year: number): number {
   return Date.UTC(year, credit.getUTCMonth(), Math.min(credit.getUTCDate(), lastDay));
 }
 
+export interface ActionContext {
+  approaching: Set<string>;
+  projected: Set<string>;
+  inactive: Set<string>;
+  /** Birthdate (YYYY-MM-DD) from the client's Purchase Application Form, if any. */
+  birthdateOf: (client: Client) => string | undefined;
+  now: Date;
+}
+
+export function buildActionContext(
+  forecast: ForecastGroups,
+  birthdateOf: (client: Client) => string | undefined = () => undefined,
+  now: Date = new Date()
+): ActionContext {
+  return {
+    approaching: new Set(forecast.approaching10.map((c) => c.id)),
+    projected: new Set(forecast.projected10Next30.map((c) => c.id)),
+    inactive: new Set(forecast.inactive.map((c) => c.id)),
+    birthdateOf,
+    now,
+  };
+}
+
 /**
- * Raises action flags per customer:
+ * Raises action flags for one customer, highest priority first:
  *
  * | Flag                    | Rule                                                  | Priority |
  * |-------------------------|-------------------------------------------------------|----------|
  * | Repeat-Purchase         | Repeat buyer, 10% reached, not inactive               | High     |
  * | Payment Milestone       | Approaching 10% or projected to reach 10% in 30 days  | Medium   |
- * | Relationship Touchpoint | Purchase anniversary within 7 days                    | Medium   |
+ * | Relationship Touchpoint | Birthday (from the PAF) or purchase anniversary       | Medium   |
+ * |                         | within 7 days — whichever is sooner                   |          |
  * | Inactive Engagement     | No payment progress for 30+ days                      | Low      |
- *
+ */
+export function flagsForClient(client: Client, ctx: ActionContext): CustomerFlag[] {
+  const flags: CustomerFlag[] = [];
+
+  if (isRepeatBuyer(client) && client.payment_percentage >= 10 && !ctx.inactive.has(client.id)) {
+    flags.push({
+      flag: "repeat_purchase",
+      priority: "high",
+      keyIndicator: `Existing repeat buyer (${client.contracts.length} properties)`,
+      recommendedAction: "Personalized inventory check-in",
+    });
+  }
+
+  if (ctx.approaching.has(client.id) || ctx.projected.has(client.id)) {
+    flags.push({
+      flag: "payment_milestone",
+      priority: "medium",
+      keyIndicator: ctx.approaching.has(client.id)
+        ? `Approaching 10% payment (${client.payment_percentage.toFixed(1)}%)`
+        : "On pace for 10% within 30 days",
+      recommendedAction: "Congratulatory message and project update",
+    });
+  }
+
+  const touchpoint = nearestTouchpoint(client, ctx);
+  if (touchpoint !== null && touchpoint.days <= ANNIVERSARY_WINDOW_DAYS) {
+    const { days, event } = touchpoint;
+    flags.push({
+      flag: "relationship_touchpoint",
+      priority: "medium",
+      keyIndicator: days === 0 ? `${event} today` : `${event} within ${days} day${days === 1 ? "" : "s"}`,
+      recommendedAction: "Automated personalized greeting",
+    });
+  }
+
+  if (ctx.inactive.has(client.id)) {
+    flags.push({
+      flag: "inactive_engagement",
+      priority: "low",
+      keyIndicator: "No payment progress for 30+ days",
+      recommendedAction: "Relationship check-in",
+    });
+  }
+
+  return flags.sort(compareFlags);
+}
+
+/**
  * Returns one entry per flagged customer, sorted by priority, then by total
- * contract value (largest first).
+ * contract value (largest first). See flagsForClient for the rules.
  */
 export function computeCustomerActions(
   data: AppData,
   forecast: ForecastGroups,
-  now: Date = new Date()
+  now: Date = new Date(),
+  birthdateOf?: (client: Client) => string | undefined
 ): CustomerAction[] {
-  const approaching = new Set(forecast.approaching10.map((c) => c.id));
-  const projected = new Set(forecast.projected10Next30.map((c) => c.id));
-  const inactive = new Set(forecast.inactive.map((c) => c.id));
-
+  const ctx = buildActionContext(forecast, birthdateOf, now);
   const actions: CustomerAction[] = [];
-
   for (const client of data.clients) {
-    const flags: CustomerFlag[] = [];
-
-    if (isRepeatBuyer(client) && client.payment_percentage >= 10 && !inactive.has(client.id)) {
-      flags.push({
-        flag: "repeat_purchase",
-        priority: "high",
-        keyIndicator: `Existing repeat buyer (${client.contracts.length} properties)`,
-        recommendedAction: "Personalized inventory check-in",
-      });
-    }
-
-    if (approaching.has(client.id) || projected.has(client.id)) {
-      flags.push({
-        flag: "payment_milestone",
-        priority: "medium",
-        keyIndicator: approaching.has(client.id)
-          ? `Approaching 10% payment (${client.payment_percentage.toFixed(1)}%)`
-          : "On pace for 10% within 30 days",
-        recommendedAction: "Congratulatory message and project update",
-      });
-    }
-
-    const anniversary = nearestAnniversary(client, now);
-    if (anniversary !== null && anniversary <= ANNIVERSARY_WINDOW_DAYS) {
-      flags.push({
-        flag: "relationship_touchpoint",
-        priority: "medium",
-        keyIndicator:
-          anniversary === 0 ? "Purchase anniversary today" : `Purchase anniversary within ${anniversary} day${anniversary === 1 ? "" : "s"}`,
-        recommendedAction: "Automated personalized greeting",
-      });
-    }
-
-    if (inactive.has(client.id)) {
-      flags.push({
-        flag: "inactive_engagement",
-        priority: "low",
-        keyIndicator: "No payment progress for 30+ days",
-        recommendedAction: "Relationship check-in",
-      });
-    }
-
-    if (flags.length > 0) {
-      flags.sort(compareFlags);
-      actions.push({ client, primary: flags[0], flags });
-    }
+    const flags = flagsForClient(client, ctx);
+    if (flags.length > 0) actions.push({ client, primary: flags[0], flags });
   }
-
   return actions.sort(
     (a, b) => compareFlags(a.primary, b.primary) || b.client.contract_value - a.client.contract_value
   );
+}
+
+/**
+ * Days until the next birthday, counted from `now` (UTC calendar days).
+ * Returns null for a missing or unreadable birthdate.
+ */
+export function daysUntilBirthday(birthdateIso: string | undefined, now: Date): number | null {
+  if (!birthdateIso) return null;
+  const birth = new Date(`${birthdateIso.slice(0, 10)}T00:00:00.000Z`);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  let next = anniversaryInYear(birth, now.getUTCFullYear());
+  if (next < today) next = anniversaryInYear(birth, now.getUTCFullYear() + 1);
+  return Math.round((next - today) / DAY_MS);
+}
+
+/** The sooner of the client's birthday and purchase anniversary; birthday wins a tie. */
+function nearestTouchpoint(client: Client, ctx: ActionContext): { days: number; event: string } | null {
+  const birthday = daysUntilBirthday(ctx.birthdateOf(client), ctx.now);
+  const anniversary = nearestAnniversary(client, ctx.now);
+  if (birthday !== null && (anniversary === null || birthday <= anniversary)) return { days: birthday, event: "Birthday" };
+  if (anniversary !== null) return { days: anniversary, event: "Purchase anniversary" };
+  return null;
 }
 
 function nearestAnniversary(client: Client, now: Date): number | null {

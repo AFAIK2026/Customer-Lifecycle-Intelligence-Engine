@@ -40,6 +40,21 @@ Maria Santos,5000000,475000,Valid ID;Proof of Income;Tax Returns
 
 The email address that (mock) milestone alerts are sent to is configurable in-app under **Notifications → Alert Recipient**. Default seed value: `joseph.bagadiong@filinvestcity.com`.
 
+## Purchase Application Forms (client details)
+
+**Upload PAF** imports the PAF workbook (`.xlsx`) with a *Customer Details* sheet and optional
+*Spouse Details* / *Corporate Buyer Template* sheets. Rows are matched to clients by
+Contract Number, then by Customer Name; forms for customers not yet in the Sales Report are kept
+and attach automatically later. Each client page then shows a **Client Profile** (Personal,
+Contact, Buyer & Employment, Spouse, Corporate) and a **Recommended Actions** card, and the
+dashboard raises "Birthday within N days" touchpoints from the PAF birthdate.
+
+- TIN and government ID numbers are never imported (only the ID type is kept).
+- PAF details are masked on screen while "Customer names hidden" is on.
+- Like all app data, PAF details live only in this browser's storage, unencrypted. Don't use the
+  app on shared computers.
+- Design: `docs/design/paf-client-details.md`.
+
 ## Prospect analysis (Python) — Stage 1
 
 The High-Potential Prospect Profile is moving from fixed rules to a statistical model

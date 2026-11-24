@@ -14,6 +14,8 @@ function emptyData(): AppData {
     imports: [],
     baseline: null,
     customer_aliases: {},
+    client_profiles: {},
+    paf_imports: [],
   };
 }
 

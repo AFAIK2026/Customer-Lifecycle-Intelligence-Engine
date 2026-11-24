@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { AppData, Client, Contract } from "@/types";
 import { buildDocStatus } from "@/lib/milestones";
 import {
+  buildActionContext,
   buildProspectProfile,
   buildRepeatBuyerPersona,
   computeCustomerActions,
   daysUntilAnniversary,
+  daysUntilBirthday,
+  flagsForClient,
   lifecycleStage,
   summarizeCustomerBase,
   type ForecastGroups,
@@ -51,6 +54,8 @@ function data(clients: Client[]): AppData {
     imports: [],
     baseline: null,
     customer_aliases: {},
+    client_profiles: {},
+    paf_imports: [],
   };
 }
 
@@ -204,5 +209,41 @@ describe("computeCustomerActions", () => {
     const [action] = computeCustomerActions(data([c]), { ...noForecast, projected10Next30: [c], inactive: [c] }, NOW);
     expect(action.flags.map((f) => f.flag)).toEqual(["payment_milestone", "relationship_touchpoint", "inactive_engagement"]);
     expect(action.primary.keyIndicator).toBe("On pace for 10% within 30 days");
+  });
+});
+
+describe("birthday touchpoints", () => {
+  it("counts days to the next birthday, rolling over the year", () => {
+    expect(daysUntilBirthday("1960-11-27", NOW)).toBe(3);
+    expect(daysUntilBirthday("1960-11-24", NOW)).toBe(0);
+    expect(daysUntilBirthday("1960-11-20", NOW)).toBe(361);
+    expect(daysUntilBirthday(undefined, NOW)).toBeNull();
+    expect(daysUntilBirthday("", NOW)).toBeNull();
+  });
+
+  it("flags a PAF birthday within 7 days ahead of a later anniversary", () => {
+    const c = client("b", [contract("1", 1e6, "T", "2023-11-30T00:00:00.000Z")], 3);
+    const [action] = computeCustomerActions(data([c]), noForecast, NOW, () => "1985-11-26");
+    expect(action.primary).toMatchObject({
+      flag: "relationship_touchpoint",
+      keyIndicator: "Birthday within 2 days",
+      recommendedAction: "Automated personalized greeting",
+    });
+  });
+
+  it("falls back to the anniversary when it is sooner or there is no birthdate", () => {
+    const c = client("b", [contract("1", 1e6, "T", "2023-11-25T00:00:00.000Z")], 3);
+    expect(computeCustomerActions(data([c]), noForecast, NOW, () => "1985-11-29")[0].primary.keyIndicator).toBe(
+      "Purchase anniversary within 1 day"
+    );
+    expect(computeCustomerActions(data([c]), noForecast, NOW)[0].primary.keyIndicator).toBe(
+      "Purchase anniversary within 1 day"
+    );
+  });
+
+  it("flagsForClient matches computeCustomerActions", () => {
+    const c = client("x", [contract("1", 1e6)], 9.5);
+    const ctx = buildActionContext({ ...noForecast, approaching10: [c] }, () => "1990-11-24", NOW);
+    expect(flagsForClient(c, ctx).map((f) => f.flag)).toEqual(["payment_milestone", "relationship_touchpoint"]);
   });
 });

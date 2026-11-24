@@ -52,3 +52,16 @@ export function isoWeekRange(dateStr: string): { start: string; end: string } {
   sunday.setDate(monday.getDate() + 6);
   return { start: monday.toISOString(), end: sunday.toISOString() };
 }
+
+/** "19 Jun 1960 (66)" — age is always derived from the birthdate so it never goes stale. */
+export function birthdateWithAge(iso: string, now: Date): string {
+  if (!iso) return "";
+  const birth = new Date(`${iso}T00:00:00.000Z`);
+  if (Number.isNaN(birth.getTime())) return "";
+  let age = now.getUTCFullYear() - birth.getUTCFullYear();
+  const beforeBirthday =
+    now.getUTCMonth() < birth.getUTCMonth() ||
+    (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() < birth.getUTCDate());
+  if (beforeBirthday) age--;
+  return `${formatDate(birth.toISOString())} (${age})`;
+}

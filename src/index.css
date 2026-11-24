@@ -153,6 +153,25 @@
     @apply border-border bg-secondary text-muted-foreground;
   }
 
+  /* Client profile tabs */
+  .profile-tabs {
+    @apply flex flex-wrap gap-1 border-b border-border;
+  }
+  .profile-tab {
+    @apply -mb-px border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-muted-foreground;
+  }
+  .profile-tab[aria-selected="true"] {
+    @apply border-primary text-foreground;
+  }
+  .profile-grid {
+    @apply grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[minmax(0,12rem)_1fr];
+  }
+
+  /* Customer priority table: clickable rows */
+  .data-table tbody tr.row-link {
+    @apply cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary;
+  }
+
   /* Customer priority table: priority pills */
   .priority-pill {
     @apply inline-flex min-w-[4.5rem] justify-center rounded-md border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide;

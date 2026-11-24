@@ -28,6 +28,8 @@ const EMPTY_DATA: AppData = {
   imports: [],
   baseline: null,
   customer_aliases: {},
+  client_profiles: {},
+  paf_imports: [],
 };
 
 function parseData(raw: string): AppData {
@@ -43,6 +45,9 @@ function parseData(raw: string): AppData {
   if (parsed.baseline === undefined) parsed.baseline = null;
   // Number existing customers in the order they were first added.
   parsed.customer_aliases = assignAliases(parsed.customer_aliases ?? {}, parsed.clients.map((c) => c.name));
+  // Data from before PAF uploads existed.
+  parsed.client_profiles ??= {};
+  parsed.paf_imports ??= [];
   return parsed;
 }
 

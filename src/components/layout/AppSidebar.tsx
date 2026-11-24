@@ -4,6 +4,7 @@ import {
   Users,
   TrendingUp,
   UploadCloud,
+  ClipboardList,
   FileBarChart,
   Bell,
   Building2,
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { to: "/clients", label: "Clients", icon: Users },
   { to: "/forecast", label: "Forecast", icon: TrendingUp },
   { to: "/upload", label: "Upload Report", icon: UploadCloud },
+  { to: "/upload-paf", label: "Upload PAF", icon: ClipboardList },
   { to: "/reports", label: "Weekly Reports", icon: FileBarChart },
   { to: "/notifications", label: "Notifications", icon: Bell },
 ];
