@@ -18,6 +18,11 @@ There is no database. Server-side code is limited to two stateless Vercel functi
 - **The extracted data is saved in this browser** (`localStorage`, key `clie_data_v1`): clients, contracts, payment
   history, milestones, notifications, import history and PAF client profiles. It **stays after a refresh, closing the
   browser or restarting the computer**, until you remove the file on the Upload page or clear the browser's site data.
+- **Automatic clean-up.** If CLIE isn't used for **14 days** (adjustable to 7 or 30 under Notifications → Data
+  Retention), everything it stored on that computer is deleted the next time it opens, or within the hour if the tab
+  is left open. After **15 minutes** without activity the screen is hidden until someone clicks or presses a key
+  (nothing is deleted). **Clear all data now** wipes it immediately, e.g. before returning a laptop. The original
+  files are unaffected: upload them again to restore.
 - **Each browser keeps its own copy.** A different browser, computer, incognito window or web address (including each
   Vercel preview URL) starts empty. Nothing is shared between users or devices.
 - **Storage is unencrypted and limited** to roughly 5 MB per browser. Don't use the app on shared computers.

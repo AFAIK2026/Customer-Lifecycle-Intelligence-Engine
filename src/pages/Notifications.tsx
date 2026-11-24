@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DataRetentionCard } from "@/components/settings/DataRetentionCard";
 
 export function Notifications() {
   const { data, setAlertEmail, displayName } = useAppData();
@@ -24,7 +25,7 @@ export function Notifications() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Every milestone triggers a mocked email alert to the address below.
+          Every milestone triggers an email alert to the address below. Data retention settings are also here.
         </p>
       </div>
 
@@ -52,6 +53,8 @@ export function Notifications() {
           </div>
         </CardContent>
       </Card>
+
+      <DataRetentionCard />
 
       <Card>
         <CardHeader>

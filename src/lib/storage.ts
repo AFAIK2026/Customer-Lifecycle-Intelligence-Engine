@@ -96,8 +96,27 @@ export function saveData(data: AppData): void {
   }
 }
 
-export function resetData(): AppData {
+/** Session-only caches that may hold derived results (e.g. prospect analysis); cleared with the data. */
+const SESSION_CACHE_PREFIXES = ["clie_prospect_analysis:"] as const;
+
+/**
+ * Deletes everything CLIE stores about customers in this browser: app data,
+ * pre-rename data and session caches. Settings-free activity tracking is kept.
+ */
+export function clearStoredData(): void {
   localStorage.removeItem(STORAGE_KEY);
   for (const legacyKey of LEGACY_STORAGE_KEYS) localStorage.removeItem(legacyKey);
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (key && SESSION_CACHE_PREFIXES.some((prefix) => key.startsWith(prefix))) sessionStorage.removeItem(key);
+    }
+  } catch {
+    // sessionStorage can be blocked; nothing to clear then.
+  }
+}
+
+export function resetData(): AppData {
+  clearStoredData();
   return loadData();
 }

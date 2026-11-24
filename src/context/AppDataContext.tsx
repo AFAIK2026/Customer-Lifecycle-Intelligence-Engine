@@ -1,6 +1,16 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AppData, Client, ClientProfile, Notification } from "@/types";
-import { loadData, saveData } from "@/lib/storage";
+import { clearStoredData, loadData, resetData, saveData } from "@/lib/storage";
+import {
+  enforceRetentionOnStartup,
+  isExpired,
+  readActivity,
+  touchActivity,
+  writeActivity,
+  DEFAULT_RETENTION_DAYS,
+  type ActivityRecord,
+  type RetentionDays,
+} from "@/lib/retention";
 import { parseSalesReport } from "@/lib/salesReport";
 import { applyImport, removeImport as removeImportFromData } from "@/lib/imports";
 import { buildDocStatus, detectNewMilestones } from "@/lib/milestones";
@@ -33,6 +43,13 @@ interface AppDataContextValue {
   removePafImport: (importId: string) => void;
   /** The client's Purchase Application Form details, if any were uploaded. */
   profileFor: (client: Client) => ClientProfile | undefined;
+  /** Current retention setting and activity for this browser. */
+  retention: ActivityRecord;
+  setRetentionDays: (days: RetentionDays) => void;
+  /** Deletes all CLIE data stored in this browser. */
+  clearAllData: () => void;
+  /** Hides the "data was cleared" notice. */
+  dismissPurgeNotice: () => void;
   setAlertEmail: (email: string) => void;
   setHideCustomerNames: (hide: boolean) => void;
   /** The name to show for a customer: "Customer N" while names are hidden, the real name otherwise. */
@@ -43,7 +60,12 @@ interface AppDataContextValue {
 const AppDataContext = createContext<AppDataContextValue | null>(null);
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<AppData>(() => loadData());
+  // Retention runs before the data is loaded, so expired data is never read into memory.
+  const [data, setData] = useState<AppData>(() => {
+    enforceRetentionOnStartup(localStorage, clearStoredData);
+    return loadData();
+  });
+  const [retention, setRetention] = useState<ActivityRecord>(() => currentActivity());
   // Latest data, updated synchronously by importFile so several files imported
   // back-to-back each build on the previous one rather than a stale render.
   const dataRef = useRef(data);
@@ -52,6 +74,48 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveData(data);
   }, [data]);
+
+  // Record use of the app (throttled), and purge if the tab is left open but unused past the retention period.
+  useEffect(() => {
+    const onActivity = () => touchActivity(localStorage);
+    const events = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+    for (const e of events) window.addEventListener(e, onActivity, { passive: true });
+
+    const check = window.setInterval(() => {
+      const record = readActivity(localStorage);
+      if (record && isExpired(record, new Date())) {
+        const purgedAt = new Date().toISOString();
+        const fresh = resetData();
+        writeActivity(localStorage, { ...record, last_active: purgedAt, purged_at: purgedAt });
+        dataRef.current = fresh;
+        setData(fresh);
+        setRetention(currentActivity());
+      }
+    }, 60 * 60 * 1000);
+
+    return () => {
+      for (const e of events) window.removeEventListener(e, onActivity);
+      window.clearInterval(check);
+    };
+  }, []);
+
+  function setRetentionDays(days: RetentionDays) {
+    const record = currentActivity();
+    writeActivity(localStorage, { ...record, retention_days: days, last_active: new Date().toISOString() });
+    setRetention(currentActivity());
+  }
+
+  function clearAllData() {
+    const fresh = resetData();
+    dataRef.current = fresh;
+    setData(fresh);
+  }
+
+  function dismissPurgeNotice() {
+    const { purged_at: _cleared, ...rest } = currentActivity();
+    writeActivity(localStorage, rest);
+    setRetention(currentActivity());
+  }
 
   function importFile(fileName: string, text: string): ImportFileResult {
     const rows = parseSalesReport(text);
@@ -152,10 +216,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppDataContext.Provider value={{ data, importFile, removeImport, importPafWorkbook, removePafImport, profileFor, setAlertEmail, setHideCustomerNames, displayName, updateClientDocuments }}>
+    <AppDataContext.Provider value={{ data, importFile, removeImport, importPafWorkbook, removePafImport, profileFor, retention, setRetentionDays, clearAllData, dismissPurgeNotice, setAlertEmail, setHideCustomerNames, displayName, updateClientDocuments }}>
       {children}
     </AppDataContext.Provider>
   );
+}
+
+function currentActivity(): ActivityRecord {
+  return readActivity(localStorage) ?? { last_active: new Date().toISOString(), retention_days: DEFAULT_RETENTION_DAYS };
 }
 
 export function useAppData(): AppDataContextValue {

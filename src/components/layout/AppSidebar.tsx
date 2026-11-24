@@ -26,7 +26,7 @@ const NAV_ITEMS = [
 ];
 
 export function AppSidebar() {
-  const { data, setHideCustomerNames } = useAppData();
+  const { data, setHideCustomerNames, retention } = useAppData();
   const hidden = data.settings.hide_customer_names;
 
   return (
@@ -92,6 +92,7 @@ export function AppSidebar() {
       <div className="border-t border-border px-5 py-4">
         <p className="text-[11px] text-muted-foreground">Operations Team</p>
         <p className="text-[11px] text-muted-foreground/70">v1.0 · Local data only</p>
+        <p className="text-[11px] text-muted-foreground/70">Auto-clears after {retention.retention_days} days unused</p>
       </div>
     </aside>
   );
