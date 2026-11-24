@@ -1,6 +1,6 @@
 # CLIE - Customer Lifecycle Intelligence Engine
 
-Internal admin tool for the operations team to monitor real estate buyer payments and documentation status, detect milestones, forecast upcoming ones, and log (mocked) email alerts.
+Internal admin tool for the operations team to monitor real estate buyer payments and documentation status, detect milestones, forecast upcoming ones, and send email alerts.
 
 **Production:** https://customer-lifecycle-intelligence-engine.vercel.app
 
@@ -8,7 +8,22 @@ Internal admin tool for the operations team to monitor real estate buyer payment
 
 ## Stack
 
-React 18 + Vite + TypeScript + Tailwind CSS + shadcn/ui-style primitives + React Router + Recharts. All data persists in the browser's `localStorage` — no backend in v1.
+React 19 + Vite + TypeScript + Tailwind CSS + shadcn/ui-style primitives + React Router + Recharts, deployed on Vercel.
+There is no database. The only server-side code is a Vercel serverless function for email alerts (`api/send-alert.ts`).
+
+## Where your data lives
+
+- **Uploaded files are read, not kept.** The app reads the Sales Report or PAF in the browser and keeps only the
+  extracted data. The file itself is never stored or uploaded anywhere.
+- **The extracted data is saved in this browser** (`localStorage`, key `clie_data_v1`): clients, contracts, payment
+  history, milestones, notifications, import history and PAF client profiles. It **stays after a refresh, closing the
+  browser or restarting the computer**, until you remove the file on the Upload page or clear the browser's site data.
+- **Each browser keeps its own copy.** A different browser, computer, incognito window or web address (including each
+  Vercel preview URL) starts empty. Nothing is shared between users or devices.
+- **Storage is unencrypted and limited** to roughly 5 MB per browser. Don't use the app on shared computers.
+- **What leaves the browser:** when a milestone is reached, the client name, milestone and payment % are sent to
+  `api/send-alert.ts`, which emails them to the alert recipient through Resend. Nothing else is sent; PAF details and
+  government ID numbers never leave the browser (ID numbers are not even imported).
 
 ## Run locally
 
@@ -34,11 +49,11 @@ Maria Santos,5000000,475000,Valid ID;Proof of Income;Tax Returns
 - Documents are separated with `;`
 - `payment_percentage` is computed automatically
 - Existing clients are matched by name (case-insensitive) and updated; unmatched names create new client records
-- Milestones (`10% Payment`, `CREQ`) are detected by comparing the new state to each client's prior `milestones_reached`, and a mocked `Notification` (email_sent: true) is logged per newly crossed milestone
+- Milestones (`10% Payment`, `CREQ`) are detected by comparing the new state to each client's prior `milestones_reached`, and a `Notification` is logged per newly crossed milestone and emailed to the alert recipient (see below)
 
 ## Alert recipient
 
-The email address that (mock) milestone alerts are sent to is configurable in-app under **Notifications → Alert Recipient**. Default seed value: `joseph.bagadiong@filinvestcity.com`.
+The email address that milestone alerts are sent to is configurable in-app under **Notifications → Alert Recipient**. Alerts are delivered by the `api/send-alert.ts` Vercel function through [Resend](https://resend.com) and require the `RESEND_API_KEY` environment variable on Vercel; without it, alerts stay marked **Queued**. Default seed value: `joseph.bagadiong@filinvestcity.com`.
 
 ## Purchase Application Forms (client details)
 
@@ -76,7 +91,6 @@ Stage 2 (API endpoint and dashboard panel) goes ahead only if real data reaches 
 
 ## Out of scope for v1
 
-- Real email delivery (queued/mocked only)
 - Authentication / multi-user roles
 - A backend database (everything lives in `localStorage`, per-browser)
 
