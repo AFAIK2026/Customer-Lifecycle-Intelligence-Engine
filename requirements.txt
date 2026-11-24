@@ -1,0 +1,2 @@
+# Runtime dependencies of the Python prospect analysis (api/_prospects).
+numpy==2.5.3

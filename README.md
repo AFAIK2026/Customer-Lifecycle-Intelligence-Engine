@@ -40,6 +40,25 @@ Maria Santos,5000000,475000,Valid ID;Proof of Income;Tax Returns
 
 The email address that (mock) milestone alerts are sent to is configurable in-app under **Notifications → Alert Recipient**. Default seed value: `joseph.bagadiong@filinvestcity.com`.
 
+## Prospect analysis (Python) — Stage 1
+
+The High-Potential Prospect Profile is moving from fixed rules to a statistical model
+(design: `docs/design/prospect-analysis-python.md`). Stage 1 is the analysis engine
+(`api/_prospects/`) plus a command-line runner you can use on real Sales Reports.
+Everything runs locally and nothing is sent anywhere.
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+python3 scripts/prospect_analysis.py path/to/sales_report.tsv
+```
+
+Pass several reports oldest first; later files update the same contract numbers.
+Options: `--as-of YYYY-MM-DD`, `--top N`, `--show-names` (names are hidden by default), `--json`.
+Run the Python tests with `npm run test:py`.
+
+The runner prints the model's accuracy (cross-validated AUC: 0.5 = coin flip, 1.0 = perfect).
+Stage 2 (API endpoint and dashboard panel) goes ahead only if real data reaches **0.60 or higher**.
+
 ## Out of scope for v1
 
 - Real email delivery (queued/mocked only)

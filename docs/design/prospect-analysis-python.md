@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Awaiting approval (Design phase — no production code) |
+| **Status** | Approved with amendments A1–A3 (24 Nov 2026). Build Stage 1 in progress |
 | **Branch** | `claude/busy-brahmagupta-w68qmn` |
 | **Scope** | Dashboard → *High-Potential Prospect Profile* panel |
 | **Decided by user** | Python runs as a Vercel serverless function; design before build |
@@ -33,6 +33,16 @@ The analysis runs in a stateless Python function (`/api/prospect-analysis`) insi
 | Features | Taken from each customer's **first contract only** | Prevents leakage: repeat buyers have larger totals *because* they bought twice. Using first-purchase facts compares everyone at the same moment, which is exactly the situation a current prospect is in | Customer-level totals (leaky, inflates accuracy) |
 | Accuracy gate | Score prospects only if cross-validated AUC ≥ 0.60 and there are ≥ 30 repeat and ≥ 30 single buyers | Never present a model that is no better than chance as "AI insight" | Always show scores (misleading) |
 | Interpretation guard | Plain-language driver shown only if its 95% CI excludes 1.0× | Stops random noise from being presented as a finding | Show all coefficients |
+
+### Approved amendments
+
+| # | Amendment | Reason |
+|---|---|---|
+| **A1** | `tenure_years` is used in training only as a control. At scoring time every prospect gets the same tenure (the training median), and tenure is never shown as a driver or reason | Otherwise the model ranks long-standing single buyers, who have had years to buy again and didn't, as the best prospects |
+| **A2** | Train only on customers whose first purchase is at least 6 months before `as_of`. Newer customers are still scored | A customer who bought last month can't have bought again yet; counting them as "single" mislabels them |
+| **A3** | Build in two stages. **Stage 1:** Python engine, tests and a command-line runner for real Sales Reports. **Stage 2:** API endpoint and dashboard, only if Stage 1 reaches CV AUC ≥ 0.60 on real data | Confirms the data predicts repeat buying before investing in UI |
+
+Build note: the contract-value effect is expressed **per doubling** of the first contract value, not per ₱5M, because the feature is log-transformed (a fixed-peso step would not have a constant effect).
 
 ---
 
@@ -195,7 +205,7 @@ Model features (computed server-side, per customer):
 | `first_tcp` | first contract `contract_value` | `log` then standardise | Contract values are right-skewed; the log gives a per-percentage effect |
 | `first_payment_pct` | first contract `payment_percentage` | clip 0–100, standardise | Payment capacity |
 | `reached_10` | first contract `payment_percentage ≥ 10` | binary | Mirrors the business milestone; easy to interpret |
-| `tenure_years` | `as_of − first credit_date` | years, standardise | **Control variable**: older customers have had more time to buy again. Without it the model would just favour old customers |
+| `tenure_years` | `as_of − first credit_date` | years, standardise | **Control variable**: older customers have had more time to buy again. Fixed to the training median at scoring time and never shown (A1) |
 | `project_*` | first contract `project_code` | one-hot; projects with < 15 first contracts grouped as `OTHER`; most common project is the reference | Project preference |
 
 "First contract" = earliest `credit_date`; ties are broken by `contract_number`.
@@ -270,7 +280,7 @@ Errors: `400` validation, `405` non-POST, `500` unexpected (generic message; det
 2. **Fit**: logistic regression, L2 penalty λ = 1.0 on standardised coefficients (intercept unpenalised), solved by Newton–Raphson/IRLS (tolerance 1e-8, max 50 iterations). The penalty keeps estimates stable when a project perfectly predicts the label.
 3. **Validate**: stratified 5-fold CV with a fixed seed (42), refitting the scaler inside each fold. Report mean ROC-AUC (rank-based Mann–Whitney formula).
 4. **Gate**: §1 thresholds → `ok` / `insufficient_data` / `weak_signal`.
-5. **Interpret**: final fit on all customers. Odds ratio = `exp(β)`, with 95% Wald CI from the inverse penalised Hessian. Continuous effects are re-expressed in business units (per ₱5M for TCP, per 10 percentage points for payment, per year for tenure). Keep drivers whose CI excludes 1; sort by |log OR|; at most 5. `tenure_years` is labelled as a control when shown.
+5. **Interpret**: final fit on all customers. Odds ratio = `exp(β)`, with 95% Wald CI from the inverse penalised Hessian. Continuous effects are re-expressed in business units (per doubling of first contract value, per 10 percentage points of payment). Tenure is excluded from drivers (A1). Keep drivers whose CI excludes 1; sort by |log OR|; at most 5. `tenure_years` is labelled as a control when shown.
 6. **Score**: single-contract customers only. `lift = p / base_rate`. Tier `high` if lift ≥ 2.0, `promising` if 1.25 ≤ lift < 2.0, otherwise not returned. Return the top 200 by probability (the panel shows 10).
 7. **Reasons**: per customer, the two features with the largest positive contribution `β_j · x_j` (standardised), rendered as short labels.
 
