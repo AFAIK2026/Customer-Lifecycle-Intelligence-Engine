@@ -28,7 +28,7 @@ def test_recovers_injected_project_effect():
     assert mean_ratio == pytest.approx(3.0, rel=0.1)
     assert coverage >= 0.8
     assert all(d["ci_low"] > 1 and d["direction"] == "up" for d in drivers)
-    assert drivers[0]["statement"].startswith("First purchase in Bayview Residences (vs Aspire Tower)")
+    assert all(d["statement"].startswith("First purchase in Bayview Residences (vs ") for d in drivers)
 
 
 def test_null_factors_are_rarely_reported(strong_result):
@@ -41,7 +41,8 @@ def test_reports_accuracy_and_model_metadata(strong_result):
     model = strong_result["model"]
     assert model["cv_auc"] >= 0.6
     assert model["cv_folds"] == 5
-    assert model["reference_project"] == "Aspire Tower"
+    # A typical (null-effect) project is the baseline, never the standout one.
+    assert model["reference_project"] in {"Aspire Tower", "Hillcrest Estates", "Marina Suites"}
     assert model["trained_on"]["repeat"] >= 30
 
 
@@ -126,3 +127,14 @@ def test_statement_formats_ratios():
     assert up.statement == "Label — 2.1× as likely to buy again (95% CI 1.4–3.2×)"
     assert down.statement == "Other — 0.55× as likely to buy again (95% CI 0.38–0.81×)"
     assert down.direction == "down" and not math.isnan(down.odds_ratio)
+
+
+def test_standout_project_is_reported_even_when_it_is_the_most_common():
+    # A4: the planted 3x effect is on Aspire Tower, the most common project (40%).
+    result = run(synthetic_payload(n=3000, seed=21, effect_project="TWR"))
+    assert result["status"] == "ok"
+    assert result["model"]["reference_project"] != "Aspire Tower"
+    twr = next(d for d in result["drivers"] if d["feature"] == "project_TWR")
+    assert twr["direction"] == "up" and twr["ci_low"] > 1
+    # ...and it can now be cited as a prospect's reason.
+    assert any("Aspire Tower" in p["reasons"] for p in result["prospects"])

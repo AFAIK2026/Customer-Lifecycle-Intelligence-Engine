@@ -31,10 +31,12 @@ def synthetic_payload(
     tenure_effect: float = 0.4,
     shuffle_labels: bool = False,
     recent_share: float = 0.0,
+    effect_project: str = "RES",
 ) -> dict:
     """Customers whose repeat buying follows a known logistic model.
 
-    True log-odds = -2.6 + project_effect * [first project is RES] + tenure_effect * tenure_years.
+    True log-odds = -2.6 + project_effect * [first project is effect_project] + tenure_effect * tenure_years.
+    TWR is the most common project (40%), RES the second (25%).
     Contract value and payment have no true effect.
     """
     rng = np.random.default_rng(seed)
@@ -44,7 +46,7 @@ def synthetic_payload(
     if recent_share:
         recent = rng.random(n) < recent_share
         tenure_years[recent] = rng.uniform(0.0, 0.4, size=recent.sum())
-    log_odds = -2.6 + project_effect * (projects == "RES") + tenure_effect * tenure_years
+    log_odds = -2.6 + project_effect * (projects == effect_project) + tenure_effect * tenure_years
     repeat = rng.random(n) < 1 / (1 + np.exp(-log_odds))
     if shuffle_labels:
         repeat = rng.permutation(repeat)

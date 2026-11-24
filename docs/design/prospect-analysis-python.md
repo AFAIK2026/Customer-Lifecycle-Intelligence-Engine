@@ -41,6 +41,7 @@ The analysis runs in a stateless Python function (`/api/prospect-analysis`) insi
 | **A1** | `tenure_years` is used in training only as a control. At scoring time every prospect gets the same tenure (the training median), and tenure is never shown as a driver or reason | Otherwise the model ranks long-standing single buyers, who have had years to buy again and didn't, as the best prospects |
 | **A2** | Train only on customers whose first purchase is at least 6 months before `as_of`. Newer customers are still scored | A customer who bought last month can't have bought again yet; counting them as "single" mislabels them |
 | **A3** | Build in two stages. **Stage 1:** Python engine, tests and a command-line runner for real Sales Reports. **Stage 2:** API endpoint and dashboard, only if Stage 1 reaches CV AUC ≥ 0.60 on real data | Confirms the data predicts repeat buying before investing in UI |
+| **A4** | The baseline project for comparisons is the most *typical* one (repeat rate closest to the overall rate), not the most common one | Found in testing: when the most common project was also the strongest, every factor read backwards ("other projects 0.2× as likely") and that project could never appear as a prospect's reason |
 
 Build note: the contract-value effect is expressed **per doubling** of the first contract value, not per ₱5M, because the feature is log-transformed (a fixed-peso step would not have a constant effect).
 
@@ -206,7 +207,7 @@ Model features (computed server-side, per customer):
 | `first_payment_pct` | first contract `payment_percentage` | clip 0–100, standardise | Payment capacity |
 | `reached_10` | first contract `payment_percentage ≥ 10` | binary | Mirrors the business milestone; easy to interpret |
 | `tenure_years` | `as_of − first credit_date` | years, standardise | **Control variable**: older customers have had more time to buy again. Fixed to the training median at scoring time and never shown (A1) |
-| `project_*` | first contract `project_code` | one-hot; projects with < 15 first contracts grouped as `OTHER`; most common project is the reference | Project preference |
+| `project_*` | first contract `project_code` | one-hot; projects with < 15 first contracts grouped as `OTHER`; the most typical project is the reference (A4) | Project preference |
 
 "First contract" = earliest `credit_date`; ties are broken by `contract_number`.
 

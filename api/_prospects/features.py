@@ -76,9 +76,13 @@ def build_rows(request: AnalysisRequest) -> list[CustomerRow]:
 class FeatureEncoder:
     """Turns rows into a numeric matrix with a fixed column layout.
 
-    Fitted on training rows only. The most common project is the reference
-    category (no column), so each project coefficient reads as
-    "compared with the reference project".
+    Fitted on training rows only. The reference category (no column) is the
+    most *typical* project: the one whose repeat-buyer rate is closest to the
+    overall rate (ties go to the larger project). Each project coefficient then
+    reads as "compared with a typical project", so a standout project appears
+    as its own factor and can be cited as a prospect's reason. (Using the most
+    common project instead made every factor read backwards whenever the most
+    common project was also the strongest — design amendment A4.)
     """
 
     reference_project: str
@@ -96,9 +100,16 @@ class FeatureEncoder:
         kept = {p for p, n in counts.items() if n >= MIN_PROJECT_SIZE}
         has_other = any(p not in kept for p in counts)
 
-        group_counts = Counter(r.project_key if r.project_key in kept else OTHER_PROJECT for r in rows)
-        # Most common group is the reference; ties go to the alphabetically first key.
-        reference = min(group_counts, key=lambda p: (-group_counts[p], p))
+        groups = [r.project_key if r.project_key in kept else OTHER_PROJECT for r in rows]
+        group_counts = Counter(groups)
+        repeat_counts = Counter(g for g, r in zip(groups, rows) if r.is_repeat)
+        overall_rate = sum(repeat_counts.values()) / len(rows) if rows else 0.0
+
+        def typicality(group: str) -> tuple[float, int, str]:
+            rate = repeat_counts[group] / group_counts[group]
+            return (abs(rate - overall_rate), -group_counts[group], group)
+
+        reference = min(group_counts, key=typicality)
         columns = tuple(sorted(p for p in group_counts if p != reference))
 
         labels = _project_labels(rows)
