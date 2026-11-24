@@ -43,13 +43,16 @@ export function milestoneBadgeClass(milestone: string): string {
   return "milestone-badge-forecast";
 }
 
+/**
+ * The Monday-to-Sunday week containing a date, in local time: start is Monday
+ * 00:00 and end is Sunday 23:59:59.999. Times are normalised so every moment in
+ * the same week gives the same `start` (it is used as the week's key).
+ */
 export function isoWeekRange(dateStr: string): { start: string; end: string } {
   const d = new Date(dateStr);
   const day = (d.getDay() + 6) % 7; // Mon=0
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - day);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+  const sunday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day + 6, 23, 59, 59, 999);
   return { start: monday.toISOString(), end: sunday.toISOString() };
 }
 
