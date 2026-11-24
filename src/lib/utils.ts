@@ -15,6 +15,14 @@ export function formatCurrency(value: number): string {
   );
 }
 
+/** Short peso amount for headline figures, e.g. ₱20.4M, ₱850K. */
+export function formatCompactCurrency(value: number): string {
+  return (
+    "₱" +
+    new Intl.NumberFormat("en-PH", { notation: "compact", maximumFractionDigits: 1 }).format(value)
+  );
+}
+
 export function formatPercent(value: number): string {
   return `${value.toFixed(2)}%`;
 }
