@@ -53,7 +53,7 @@ def read_reports(paths: list[Path]) -> tuple[dict[str, dict[str, dict]], dict[st
     customers: dict[str, dict[str, dict]] = {}
     names: dict[str, str] = {}
     for path in paths:
-        text = path.read_text(encoding="utf-8-sig")
+        text = read_text(path)
         lines = text.splitlines()
         if len(lines) < 2:
             raise ReportError(f"{path}: needs a header row and at least one data row")
@@ -89,6 +89,16 @@ def read_reports(paths: list[Path]) -> tuple[dict[str, dict[str, dict]], dict[st
             names.setdefault(key, name)
             customers.setdefault(key, {})[contract_number] = contract
     return customers, names
+
+
+def read_text(path: Path) -> str:
+    """UTF-8 when valid, otherwise Windows-1252, which is what the source system exports
+    (and what the web app decodes), e.g. "Ñ" in PEÑA is byte 0xD1."""
+    raw = path.read_bytes()
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return raw.decode("cp1252", errors="replace")
 
 
 def parse_credit_date(raw: str) -> datetime:

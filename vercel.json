@@ -1,3 +1,9 @@
 {
+  "functions": {
+    "api/prospect-analysis.py": {
+      "maxDuration": 15,
+      "excludeFiles": "{node_modules/**,src/**,tests/**,docs/**,scripts/**,dist/**,public/**}"
+    }
+  },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

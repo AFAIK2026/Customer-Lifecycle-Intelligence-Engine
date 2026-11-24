@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Approved with amendments A1–A3 (24 Nov 2026). Build Stage 1 in progress |
+| **Status** | Approved with amendments A1–A3 (24 Nov 2026). Stage 1 and Stage 2 built on this branch |
 | **Branch** | `claude/busy-brahmagupta-w68qmn` |
 | **Scope** | Dashboard → *High-Potential Prospect Profile* panel |
 | **Decided by user** | Python runs as a Vercel serverless function; design before build |

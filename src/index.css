@@ -153,6 +153,17 @@
     @apply border-border bg-secondary text-muted-foreground;
   }
 
+  /* Prospect analysis panel */
+  .model-badge {
+    @apply inline-flex flex-wrap items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-foreground/90;
+  }
+  .model-badge-fallback {
+    @apply border-warning/30 bg-warning/10;
+  }
+  .prospect-row {
+    @apply grid grid-cols-[minmax(0,1.2fr)_3rem_3rem_minmax(0,2fr)] items-center gap-3 px-3 py-2;
+  }
+
   /* Client profile tabs */
   .profile-tabs {
     @apply flex flex-wrap gap-1 border-b border-border;

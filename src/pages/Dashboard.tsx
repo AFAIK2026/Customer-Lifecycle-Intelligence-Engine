@@ -21,12 +21,13 @@ import {
   summarizeCustomerBase,
   type BuyerPersona,
   type CustomerAction,
-  type ProspectProfile,
 } from "@/lib/buyerIntelligence";
 import { cn, formatCompactCurrency, formatCurrency, formatPercent, formatDateTime, milestoneBadgeClass } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FlagChip, PriorityPill, RecommendedAction } from "@/components/actions/ActionBadges";
+import { ProspectProfileCard } from "@/components/prospects/ProspectProfileCard";
+import { useProspectAnalysis } from "@/hooks/useProspectAnalysis";
 
 /** Rows shown in the priority table before "View all" is expanded. */
 const PRIORITY_PREVIEW_ROWS = 5;
@@ -48,6 +49,7 @@ export function Dashboard() {
   }, [data, profileFor]);
 
   const { forecast, summary, persona, prospects, actions } = insights;
+  const prospectAnalysis = useProspectAnalysis(clients);
   const recent = notifications.slice(0, 8);
 
   return (
@@ -89,7 +91,12 @@ export function Dashboard() {
         </section>
         <section className="flex flex-col">
           <SectionHeading>High-Potential Prospect Profile</SectionHeading>
-          <ProspectProfileCard profile={prospects} hasCustomers={clients.length > 0} />
+          <ProspectProfileCard
+            analysis={prospectAnalysis}
+            ruleProfile={prospects}
+            clients={clients}
+            displayName={displayName}
+          />
         </section>
       </div>
 
@@ -231,53 +238,6 @@ function PersonaRow({ label, value }: { label: string; value: string }) {
         {value}
       </dd>
     </div>
-  );
-}
-
-function ProspectProfileCard({ profile, hasCustomers }: { profile: ProspectProfile; hasCustomers: boolean }) {
-  const hasBaseline = profile.repeatBuyerProjects.length > 0;
-  return (
-    <Card className="intel-panel flex-1 p-5">
-      <p className="text-sm text-foreground/90">
-        Profile of high-potential prospects likely to convert or become high-value buyers.
-      </p>
-      {!hasCustomers || !hasBaseline ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          Prospects are matched against existing repeat buyers. Upload a Sales Report that includes repeat buyers to
-          build this profile.
-        </p>
-      ) : (
-        <>
-          <ul className="mt-4 space-y-2 text-sm">
-            <ProspectBullet
-              label="Similar to existing repeat / high-value buyers"
-              count={profile.prospects.length}
-              emphasis
-            />
-            {profile.criteria.map((c) => (
-              <ProspectBullet key={c.id} label={c.label} count={c.matches} />
-            ))}
-          </ul>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Single-contract customers meeting 3 of 4 criteria. Premium bar:{" "}
-            <span className="font-mono">{formatCompactCurrency(profile.premiumThreshold)}</span> · Top projects:{" "}
-            {profile.repeatBuyerProjects.join(", ")}
-          </p>
-        </>
-      )}
-    </Card>
-  );
-}
-
-function ProspectBullet({ label, count, emphasis }: { label: string; count: number; emphasis?: boolean }) {
-  return (
-    <li className="flex items-start gap-3">
-      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-success" aria-hidden />
-      <span className={cn("flex-1", emphasis && "font-semibold")}>{label}</span>
-      <span className="font-mono text-xs text-muted-foreground" aria-label={`${count} customers`}>
-        {count}
-      </span>
-    </li>
   );
 }
 

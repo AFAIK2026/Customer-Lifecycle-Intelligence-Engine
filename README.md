@@ -9,7 +9,7 @@ Internal admin tool for the operations team to monitor real estate buyer payment
 ## Stack
 
 React 19 + Vite + TypeScript + Tailwind CSS + shadcn/ui-style primitives + React Router + Recharts, deployed on Vercel.
-There is no database. The only server-side code is a Vercel serverless function for email alerts (`api/send-alert.ts`).
+There is no database. Server-side code is limited to two stateless Vercel functions: email alerts (`api/send-alert.ts`) and the prospect analysis (`api/prospect-analysis.py`).
 
 ## Where your data lives
 
@@ -22,8 +22,10 @@ There is no database. The only server-side code is a Vercel serverless function 
   Vercel preview URL) starts empty. Nothing is shared between users or devices.
 - **Storage is unencrypted and limited** to roughly 5 MB per browser. Don't use the app on shared computers.
 - **What leaves the browser:** when a milestone is reached, the client name, milestone and payment % are sent to
-  `api/send-alert.ts`, which emails them to the alert recipient through Resend. Nothing else is sent; PAF details and
-  government ID numbers never leave the browser (ID numbers are not even imported).
+  `api/send-alert.ts`, which emails them to the alert recipient through Resend. For the prospect analysis, client ids
+  and contract figures (project, credit date, contract value, payment %) are sent to `api/prospect-analysis.py`, which
+  returns scores and stores nothing. Names, PAF details and government ID numbers never leave the browser (ID numbers
+  are not even imported).
 
 ## Run locally
 
@@ -70,24 +72,50 @@ dashboard raises "Birthday within N days" touchpoints from the PAF birthdate.
   app on shared computers.
 - Design: `docs/design/paf-client-details.md`.
 
-## Prospect analysis (Python) — Stage 1
+## Prospect analysis (Python)
 
-The High-Potential Prospect Profile is moving from fixed rules to a statistical model
-(design: `docs/design/prospect-analysis-python.md`). Stage 1 is the analysis engine
-(`api/_prospects/`) plus a command-line runner you can use on real Sales Reports.
-Everything runs locally and nothing is sent anywhere.
+The dashboard's **High-Potential Prospect Profile** is produced by a statistical model rather than fixed rules
+(design: `docs/design/prospect-analysis-python.md`):
+
+1. It learns what customers who later bought again looked like **at their first purchase** (project, contract value,
+   payment progress), controlling for how long they have been customers.
+2. It checks its own accuracy with 5-fold cross-validation (AUC: 0.5 = coin flip, 1.0 = perfect).
+3. It reports only factors whose 95% confidence interval excludes "no effect", e.g.
+   *"First purchase in Bayview Residences — 2.8× as likely (2.1–3.7×)"*.
+4. It scores single-contract customers: **high-potential** at 2× the average likelihood or more, **promising** at 1.25×.
+
+The model runs in the Vercel Python function `api/prospect-analysis.py` (NumPy only; logic in `api/_prospects/`).
+The browser sends **client ids and contract figures only** — never names, documents or PAF details — and nothing is
+stored or logged on the server. The panel falls back to the rule-based profile, with a notice saying why, when:
+
+- there are fewer than 30 repeat or 30 single-contract customers with 6+ months of history,
+- the model's accuracy is below AUC 0.60, or
+- the service can't be reached within 20 seconds.
+
+### Run locally
+
+`vite dev` doesn't run Vercel functions, so start the Python API alongside it (it proxies `/api/prospect-analysis`):
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
-python3 scripts/prospect_analysis.py path/to/sales_report.tsv
 ```
 
-Pass several reports oldest first; later files update the same contract numbers.
-Options: `--as-of YYYY-MM-DD`, `--top N`, `--show-names` (names are hidden by default), `--json`.
-Run the Python tests with `npm run test:py`.
+```bash
+npm run dev:api
+```
 
-The runner prints the model's accuracy (cross-validated AUC: 0.5 = coin flip, 1.0 = perfect).
-Stage 2 (API endpoint and dashboard panel) goes ahead only if real data reaches **0.60 or higher**.
+```bash
+npm run dev
+```
+
+To analyse Sales Report exports from the command line (runs locally; names hidden unless `--show-names`):
+
+```bash
+python3 scripts/prospect_analysis.py path/to/sales_report.xls
+```
+
+Pass several reports oldest first. Options: `--as-of YYYY-MM-DD`, `--top N`, `--show-names`, `--json`.
+Python tests: `npm run test:py`.
 
 ## Out of scope for v1
 

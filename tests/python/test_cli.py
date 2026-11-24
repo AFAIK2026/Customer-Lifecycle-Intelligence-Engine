@@ -78,3 +78,11 @@ def test_end_to_end_on_a_generated_report(tmp_path, capsys):
 
     assert cli.main([str(path), "--as-of", "2026-11-24", "--show-names", "--top", "3"]) == 0
     assert "NAME R" in capsys.readouterr().out
+
+
+def test_reads_windows_1252_exports(tmp_path):
+    path = tmp_path / "r.xls"
+    text = "\n".join([HEADER, "PE\u00d1A, JOSE\tC1\tTWR\tAspire Tower\t03/01/2024 12:00:00 am\t8000000\t5"])
+    path.write_bytes(text.encode("cp1252"))
+    customers, names = cli.read_reports([path])
+    assert names == {"pe\u00f1a, jose": "PE\u00d1A, JOSE"}
