@@ -115,8 +115,6 @@ function buildTabs(p: ClientProfile, now: Date): { id: TabId; label: string; fie
         { label: "Birthdate", value: birthdateWithAge(personal.birthdate, now), sensitive: true },
         { label: "Sex", value: personal.sex },
         { label: "Citizenship", value: personal.citizenship },
-        { label: "Civil status", value: personal.civil_status },
-        { label: "ID type", value: personal.id_type },
         { label: "Customer number", value: p.customer_number },
         { label: "Contract numbers", value: p.contract_numbers.join(", ") },
       ],

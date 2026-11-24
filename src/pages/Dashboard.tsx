@@ -220,7 +220,6 @@ function BuyerPersonaCard({ persona }: { persona: BuyerPersona | null }) {
             <PersonaRow label="Buyer Type" value={persona.buyerType} />
             <PersonaRow label="Common Project" value={persona.commonProject} />
             <PersonaRow label="Typical Ownership" value={`${persona.typicalOwnership}+ Properties`} />
-            <PersonaRow label="Customer Value" value={persona.customerValue} />
             <PersonaRow label="Engagement Trend" value={persona.engagementTrend} />
             <PersonaRow label="Lifecycle Stage" value={persona.lifecycleStage} />
           </dl>
